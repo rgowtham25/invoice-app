@@ -10,7 +10,7 @@ This system automates invoice processing by:
 
 1. Reading invoice images (JPG, PNG, WebP) from a directory
 2. Sending each image to the `google/gemini-2.0-flash-001` model via the OpenRouter API for structured data extraction
-3. Matching each extracted invoice to a reference record using a 3-cases fallback system (invoice number, then vendor+client+date, then vendor+client+total)
+3. Matching each extracted invoice to a reference record using a 3-strategy fallback system (invoice number, then vendor+client+date, then vendor+client+total)
 4. Validating extracted fields (vendor, client, date, totals, line items) against the reference
 5. Outputting a detailed `results.json` with per-invoice validation status and issue details
 
@@ -98,7 +98,7 @@ The system writes `results.json` to the invoice directory and prints a summary t
 
 ---
 
-## Extraction Case
+## Extraction Strategy
 
 Each invoice image is encoded as a base64 string and sent to the OpenRouter API using the `google/gemini-2.0-flash-001` vision model.
 
@@ -117,19 +117,19 @@ Each invoice image is encoded as a base64 string and sent to the OpenRouter API 
 
 ---
 
-## Matching Cases
+## Matching Strategy
 
-In real-world scenarios, invoice numbers can be missing, misread by the AI, or inconsistent across systems. To handle this, matching uses a 3-cases — each cases is tried in order and stops as soon as a confident match is found.
+In real-world scenarios, invoice numbers can be missing, misread by the AI, or inconsistent across systems. To handle this, matching uses a 3-strategy waterfall — each strategy is tried in order and stops as soon as a confident match is found.
 
-### Case 1 — Exact Invoice Number Match
+### Strategy 1 — Exact Invoice Number Match
 The extracted invoice number is compared directly against the reference dataset. This is the primary and fastest path, covering most clean invoices.
 
-### Case 2 — Vendor + Client + Date Similarity
+### Strategy 2 — Vendor + Client + Date Similarity
 Used when the invoice number is missing or incorrect. The system computes fuzzy similarity scores for vendor name, client name, and invoice date separately, then averages them. A combined score above 75% is required for a match.
 
 This handles cases where the AI misreads the invoice number but correctly extracts the other fields.
 
-### Case 3 — Vendor + Client + Total Amount
+### Strategy 3 — Vendor + Client + Total Amount
 Used when both invoice number and date are unreliable or absent. The date signal is replaced with total amount as the third matching criterion. If vendor and client names are similar AND the total amount matches within ±$0.10, the invoice is matched.
 
 This handles invoices where the date field is physically not present on the document.

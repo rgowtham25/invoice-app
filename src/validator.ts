@@ -92,7 +92,8 @@ function matchLineItems(
 export function validateInvoice(
   extracted: InvoiceData,
   reference: ReferenceRecord | null,
-  sourceFile: string
+  sourceFile: string,
+  matchMethod: string = 'invoice_number'
 ): ValidationResult {
   if (!reference) {
     return {
@@ -101,7 +102,11 @@ export function validateInvoice(
       status: 'unmatched',
       extracted,
       reference: null,
-      issues: [{ field: 'invoice_number', extracted: extracted.invoice_number, reference: null, note: 'No matching record in reference dataset' }]
+      issues: [{ 
+        field: 'invoice_number', 
+        extracted: extracted.invoice_number, 
+        reference: null, 
+        note: 'No matching record in reference dataset' }]
     };
   }
 
@@ -152,4 +157,59 @@ export function validateInvoice(
     reference,
     issues
   };
+}
+
+/**
+ * Finds the best matching reference record for an extracted invoice.
+ * Strategy:
+ *   1. Exact invoice number match (primary key)
+ *   2. Fallback: vendor + client + date similarity (when invoice number is missing/wrong)
+ *   3. Fallback: vendor + client + total amount (when date is also unreliable)
+ */
+export function findBestMatch(
+  extracted: InvoiceData,
+  references: ReferenceRecord[]
+): { record: ReferenceRecord; method: string } | null {
+
+  // Strategy 1: exact invoice number match
+  if (extracted.invoice_number) {
+    const exact = references.find(
+      r => r.invoice_number.trim() === extracted.invoice_number.trim()
+    );
+    if (exact) return { record: exact, method: 'invoice_number' };
+  }
+
+  // Strategy 2: vendor + client + date similarity
+  const byDetails = references
+    .map(r => {
+      const vendorSim = stringSimilarity(extracted.vendor_name ?? '', r.vendor_name);
+      const clientSim = stringSimilarity(extracted.client_name ?? '', r.client_name);
+      const dateSim = stringSimilarity(extracted.invoice_date ?? '', r.invoice_date);
+      const score = (vendorSim + clientSim + dateSim) / 3;
+      return { record: r, score, method: 'vendor_client_date' };
+    })
+    .filter(m => m.score >= 0.75)
+    .sort((a, b) => b.score - a.score);
+
+  if (byDetails.length > 0) {
+    return { record: byDetails[0].record, method: byDetails[0].method };
+  }
+
+  // Strategy 3: vendor + client + total amount
+  const byTotal = references
+    .map(r => {
+      const vendorSim = stringSimilarity(extracted.vendor_name ?? '', r.vendor_name);
+      const clientSim = stringSimilarity(extracted.client_name ?? '', r.client_name);
+      const totalMatch = numbersMatch(extracted.total_amount, r.total_amount, 0.10) ? 1 : 0;
+      const score = (vendorSim + clientSim + totalMatch) / 3;
+      return { record: r, score, method: 'vendor_client_total' };
+    })
+    .filter(m => m.score >= 0.75)
+    .sort((a, b) => b.score - a.score);
+
+  if (byTotal.length > 0) {
+    return { record: byTotal[0].record, method: byTotal[0].method };
+  }
+
+  return null;
 }

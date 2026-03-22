@@ -18,11 +18,11 @@ export async function extractInvoiceData(imagePath: string): Promise<InvoiceData
 
   const userPrompt = `Extract all data from this invoice image and return a JSON object with exactly this structure:
 {
-  "invoice_number": "string",
-  "invoice_date": "YYYY-MM-DD format",
-  "vendor_name": "string",
-  "vendor_details": "string (address, email, phone if present)",
-  "client_name": "string",
+  "invoice_number": "string or null",
+  "invoice_date": "YYYY-MM-DD format  or null",
+  "vendor_name": "string or null",
+  "vendor_details": "string (address, email, phone if present) or null",
+  "client_name": "string or null",
   "client_details": "string (address if present)",
   "currency": "USD/EUR/etc",
   "net_total": number or null,
@@ -40,8 +40,10 @@ export async function extractInvoiceData(imagePath: string): Promise<InvoiceData
     }
   ]
 }
-
-Return ONLY the JSON object, no other text.`;
+Important rules:
+1. If a field is not found or not visible in the invoice, return null for that field.
+2. Never return "N/A", "unknown", or empty string "" for missing fields, always use null.
+3. Return ONLY the JSON object, no other text.`;
 
   const response = await fetch(OPENROUTER_API_URL, {
     method: 'POST',

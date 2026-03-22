@@ -2,13 +2,12 @@ import 'dotenv/config';
 import fs from 'fs';
 import path from 'path';
 import { extractInvoiceData } from './extractor';
-import { validateInvoice } from './validator';
+import { validateInvoice, findBestMatch } from './validator';
 import { ReferenceRecord, ValidationResult } from './types';
 
 async function processInvoices(invoiceDir: string, referenceFile: string): Promise<void> {
   // Load reference data
   const referenceData: ReferenceRecord[] = JSON.parse(fs.readFileSync(referenceFile, 'utf-8'));
-  const referenceMap = new Map(referenceData.map(r => [r.invoice_number, r]));
 
   // Find invoice images
   const imageExtensions = ['.jpg', '.jpeg', '.png', '.webp'];
@@ -34,14 +33,17 @@ async function processInvoices(invoiceDir: string, referenceFile: string): Promi
       const extracted = await extractInvoiceData(imagePath);
       console.log(`  Extracted invoice #${extracted.invoice_number}`);
 
-      const reference = referenceMap.get(extracted.invoice_number) ?? null;
+      const match = findBestMatch(extracted, referenceData);
+      const reference = match?.record ?? null;
+      const matchMethod = match?.method ?? 'none';
+
       if (reference) {
-        console.log(`  Matched to reference record #${reference.invoice_number}`);
+        console.log(`  Matched to reference record #${reference.invoice_number} (via ${matchMethod})`);
       } else {
         console.log(`  No reference record found for invoice #${extracted.invoice_number}`);
       }
 
-      const result = validateInvoice(extracted, reference, file);
+      const result = validateInvoice(extracted, reference, file, matchMethod);
       console.log(`  Status: ${result.status.toUpperCase()} (${result.issues.length} issue(s))\n`);
       results.push(result);
     } catch (err) {

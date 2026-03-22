@@ -5,13 +5,11 @@ import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import { extractInvoiceData } from './extractor';
-import { validateInvoice } from './validator';
+import { validateInvoice, findBestMatch } from './validator';
 import { ReferenceRecord, ValidationResult } from './types';
 
 const app = express();
 const PORT = process.env.PORT ?? 3000;
-
-// Serve static frontend
 
 // Multer: store uploads in a temp dir, keep original filename
 const storage = multer.diskStorage({
@@ -35,7 +33,6 @@ let referenceData: ReferenceRecord[] = [];
 if (fs.existsSync(referenceFile)) {
   referenceData = JSON.parse(fs.readFileSync(referenceFile, 'utf-8'));
 }
-const referenceMap = new Map(referenceData.map(r => [r.invoice_number, r]));
 
 // POST /api/process — accepts multiple invoice image files
 app.post('/api/process', upload.array('invoices'), async (req, res) => {
@@ -51,8 +48,10 @@ app.post('/api/process', upload.array('invoices'), async (req, res) => {
   for (const file of files) {
     try {
       const extracted = await extractInvoiceData(file.path);
-      const reference = referenceMap.get(extracted.invoice_number) ?? null;
-      const result = validateInvoice(extracted, reference, file.originalname);
+      const match = findBestMatch(extracted, referenceData);
+      const reference = match?.record ?? null;
+      const matchMethod = match?.method ?? 'none';
+      const result = validateInvoice(extracted, reference, file.originalname, matchMethod);
       results.push(result);
     } catch (err) {
       errors.push({ file: file.originalname, error: err instanceof Error ? err.message : String(err) });

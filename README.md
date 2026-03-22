@@ -53,7 +53,7 @@ npm install
 
 Example environment file and fill in your API key:
 
-Edit `.env`:
+Create `.env` file:
 
 ```
 OPENROUTER_API_KEY=your_actual_openrouter_api_key_here

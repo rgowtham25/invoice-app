@@ -12,7 +12,6 @@ const app = express();
 const PORT = process.env.PORT ?? 3000;
 
 // Serve static frontend
-app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // Multer: store uploads in a temp dir, keep original filename
 const storage = multer.diskStorage({

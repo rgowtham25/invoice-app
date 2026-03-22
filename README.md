@@ -51,11 +51,7 @@ npm install
 
 ### 2. Configure Environment Variables
 
-Copy the example environment file and fill in your API key:
-
-```bash
-cp .env.example .env
-```
+Example environment file and fill in your API key:
 
 Edit `.env`:
 
